@@ -28,43 +28,45 @@ function App() {
       }
     });
 
-   const speechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    if (!speechRecognition) {
-      recogitionRef.current = SpeechRecognition();
+    if (SpeechRecognition) {
+      recogitionRef.current = new SpeechRecognition();
       recogitionRef.current.continuous = true;
       recogitionRef.current.interimResults = true;
       recogitionRef.current.lang = 'en-US';
 
-      recogitionRef.current.onresult = (event:any) => {
+      recogitionRef.current.onresult = (event: any) => {
         const transcript = event.results[event.results.length - 1][0].transcript;
         console.log('Transcript:', transcript);
 
-        // at this point we will send the transcript to the backend for further processing
-      }
+        socketRef.current?.emit('transcription', { text: transcript });
+      };
+    } else {
+      console.warn('Speech Recognition not supported in this browser');
     }
-   
+
     return () => {
       socketRef.current?.disconnect();
     }
   }, [isRecording]);
 
   const handleRecording = () => {
-    if (isRecording) {
+    if (!isRecording) {
       recogitionRef.current?.start();
       setIsRecording(true);
     } else {
       recogitionRef.current?.stop();
       setIsRecording(false);
     }
-  }
-  
+  };
+
   return (
     <>
       <div className="app">
         <h1>Voice transcription project</h1>
 
-        <button type="button" onClick={() => setIsRecording(!isRecording)}>
+        <button type="button" onClick={handleRecording}>
           {isRecording ? 'Stop Recording' : 'Start Recording'}
         </button>
 
