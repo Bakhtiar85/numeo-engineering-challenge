@@ -1,33 +1,80 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+// frontend\src\App.tsx
+
+import { useState, useRef, useEffect } from 'react'
+import { io, Socket } from 'socket.io-client'
+import type { SocketResposne } from './types';
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcript, setTranscript] = useState<string[]>([]);
+  const recogitionRef = useRef<MediaRecorder | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
+  useEffect(() => {
+    // initialize socket connection
+    socketRef.current = io('http://localhost:3001');
+
+    socketRef.current.on('connect', () => {
+      console.log('Connected to server');
+    });
+
+    socketRef.current.on('transcription', (response: SocketResposne) => {
+      if (response.data) {
+        setTranscript(prev => [...prev, response.data as string]);
+      }
+      if (response.errror) {
+        console.error('Error from server:', response.errror);
+      }
+    });
+
+   const speechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!speechRecognition) {
+      recogitionRef.current = SpeechRecognition();
+      recogitionRef.current.continuous = true;
+      recogitionRef.current.interimResults = true;
+      recogitionRef.current.lang = 'en-US';
+
+      recogitionRef.current.onresult = (event:any) => {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        console.log('Transcript:', transcript);
+
+        // at this point we will send the transcript to the backend for further processing
+      }
+    }
+   
+    return () => {
+      socketRef.current?.disconnect();
+    }
+  }, [isRecording]);
+
+  const handleRecording = () => {
+    if (isRecording) {
+      recogitionRef.current?.start();
+      setIsRecording(true);
+    } else {
+      recogitionRef.current?.stop();
+      setIsRecording(false);
+    }
+  }
+  
   return (
     <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
+      <div className="app">
+        <h1>Voice transcription project</h1>
+
+        <button type="button" onClick={() => setIsRecording(!isRecording)}>
+          {isRecording ? 'Stop Recording' : 'Start Recording'}
         </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
+
+        <div className="transcription">
+          <h2>Transcription</h2>
+          {transcript.map((line, index) => (
+            <p key={index}>{line}</p>
+          ))}
+        </div>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
     </>
   )
 }
